@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>KFC 地图管理系统</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map {
+            height: 85vh;
+            margin: 10px;
+        }
+        .search-container {
+            margin: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .search-box {
+            width: 300px;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .search-btn {
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 5px;
+        }
+        .search-btn:hover {
+            background: #0056b3;
+        }
+        .filter-container {
+            margin: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .filter-select {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .result-count {
+            margin: 10px;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+<h2>🍗 KFC 门店地图管理系统</h2>
+<div class="search-container">
+    <input type="text" id="searchInput" class="search-box" placeholder="输入店名或地址搜索..." onkeypress="handleKeyPress(event)">
+    <button onclick="searchStores()" class="search-btn">搜索</button>
+    <button onclick="clearSearch()" class="search-btn" style="background: #6c757d;">显示全部</button>
+
+    <div class="filter-container">
+        <span>排序方式:</span>
+        <select id="sortSelect" class="filter-select" onchange="applyFilters()">
+            <option value="name">按店名排序</option>
+            <option value="id">按ID排序</option>
+        </select>
+
+        <span>显示数量:</span>
+        <select id="limitSelect" class="filter-select" onchange="applyFilters()">
+            <option value="0">全部</option>
+            <option value="10">前10个</option>
+            <option value="20">前20个</option>
+            <option value="50">前50个</option>
+        </select>
+    </div>
+
+    <div id="resultCount" class="result-count"></div>
+</div>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+    // 全局变量
+    let allStores = [];
+    let currentMarkers = [];
+    let currentDisplayedStores = [];
+
+    const map = L.map('map').setView([30.6, 114.3], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19
+    }).addTo(map);
+
+    // 加载所有KFC门店
+    async function loadKfc() {
+        const res = await fetch('/api/kfc');
+        allStores = await res.json();
+        currentDisplayedStores = [...allStores];
+        updateResultCount();
+        displayStoresOnMap(allStores);
+    }
+
+    // 在地图上显示门店
+    function displayStoresOnMap(stores) {
+        // 清除现有标记
+        clearMarkers();
+
+        stores.forEach(kfc => {
+            const marker = L.marker([kfc.latitude, kfc.longitude]).addTo(map)
+                .bindPopup(`<b>${kfc.name}</b><br>${kfc.address}<br>${kfc.phone || ''}<br>
+            <button onclick="editKfc(${kfc.id})">编辑</button>
+            <button onclick="deleteKfc(${kfc.id})">删除</button>`);
+            currentMarkers.push(marker);
+        });
+    }
+
+    // 清除所有标记
+    function clearMarkers() {
+        currentMarkers.forEach(marker => {
+            map.removeLayer(marker);
+        });
+        currentMarkers = [];
+    }
+
+    // 搜索门店
+    function searchStores() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+
+        if (!searchTerm) {
+            currentDisplayedStores = [...allStores];
+        } else {
+            currentDisplayedStores = allStores.filter(store =>
+                store.name.toLowerCase().includes(searchTerm) ||
+                (store.address && store.address.toLowerCase().includes(searchTerm)) ||
+                (store.phone && store.phone.includes(searchTerm))
+            );
+        }
+
+        updateResultCount();
+        applyFilters();
+    }
+
+    // 处理键盘事件（按回车搜索）
+    function handleKeyPress(event) {
+        if (event.key === 'Enter') {
+            searchStores();
+        }
+    }
+
+    // 清空搜索
+    function clearSearch() {
+        document.getElementById('searchInput').value = '';
+        document.getElementById('sortSelect').value = 'name';
+        document.getElementById('limitSelect').value = '0';
+        currentDisplayedStores = [...allStores];
+        updateResultCount();
+        applyFilters();
+    }
+
+    // 应用所有筛选条件
+    function applyFilters() {
+        let filteredStores = [...currentDisplayedStores];
+
+        // 排序
+        const sortBy = document.getElementById('sortSelect').value;
+        if (sortBy === 'name') {
+            filteredStores.sort((a, b) => a.name.localeCompare(b.name));
+        } else if (sortBy === 'id') {
+            filteredStores.sort((a, b) => a.id - b.id);
+        }
+
+        // 数量限制
+        const limit = parseInt(document.getElementById('limitSelect').value);
+        if (limit > 0) {
+            filteredStores = filteredStores.slice(0, limit);
+        }
+
+        // 显示到地图
+        displayStoresOnMap(filteredStores);
+
+        // 如果只有一个结果，自动聚焦到该标记
+        if (filteredStores.length === 1) {
+            const store = filteredStores[0];
+            map.setView([store.latitude, store.longitude], 15);
+        }
+    }
+
+    // 更新结果计数
+    function updateResultCount() {
+        const countElement = document.getElementById('resultCount');
+        const totalCount = allStores.length;
+        const displayedCount = currentDisplayedStores.length;
+
+        if (displayedCount === totalCount) {
+            countElement.textContent = `共找到 ${totalCount} 个门店`;
+        } else {
+            countElement.textContent = `找到 ${displayedCount} 个门店（共 ${totalCount} 个）`;
+        }
+    }
+
+    // 地图点击事件 - 添加新门店
+    map.on('click', async e => {
+        const name = prompt("请输入KFC店名：");
+        if (!name) return;
+        const address = prompt("请输入地址：");
+        const phone = prompt("请输入电话：");
+        const kfc = { name, address, phone, latitude: e.latlng.lat, longitude: e.latlng.lng };
+
+        await fetch('/api/kfc', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(kfc)
+        });
+        // 重新加载数据而不是刷新页面
+        await loadKfc();
+    });
+
+    async function deleteKfc(id) {
+        if (!confirm('确定删除该KFC门店吗？')) return;
+        await fetch(`/api/kfc/${id}`, { method: 'DELETE' });
+        // 重新加载数据而不是刷新页面
+        await loadKfc();
+    }
+
+    async function editKfc(id) {
+        const name = prompt("请输入新的店名：");
+        const address = prompt("请输入新的地址：");
+        const phone = prompt("请输入新的电话：");
+        if (!name) return;
+        const res = await fetch(`/api/kfc/${id}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ name, address, phone })
+        });
+        // 重新加载数据而不是刷新页面
+        await loadKfc();
+    }
+
+    // 初始化加载
+    loadKfc();
+</script>
+</body>
+</html>
