@@ -2,97 +2,275 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>KFC 地图管理系统</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <title>KFC 地图管理系统（百度地图）</title>
     <style>
+        body {
+            font-family: "Segoe UI", "PingFang SC", sans-serif;
+            background-color: #f9fafb;
+            margin: 0;
+            padding: 0;
+        }
+
+        h2 {
+            text-align: center;
+            background: #d32f2f;
+            color: white;
+            padding: 16px 0;
+            margin: 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
         #map {
-            height: 85vh;
+            height: 80vh;
             margin: 10px;
+            border-radius: 8px;
+            overflow: hidden;
         }
+
+        /* 搜索栏 */
         .search-container {
-            margin: 10px;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            background: #fff;
+            margin: 10px auto;
+            padding: 10px 15px;
+            width: 90%;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         }
+
         .search-box {
-            width: 300px;
+            flex: 1;
+            min-width: 250px;
             padding: 8px 12px;
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 14px;
+            transition: all 0.2s ease-in-out;
         }
+        .search-box:focus {
+            border-color: #d32f2f;
+            outline: none;
+            box-shadow: 0 0 4px rgba(211,47,47,0.3);
+        }
+
         .search-btn {
             padding: 8px 16px;
-            background: #007bff;
+            background: #d32f2f;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            margin-left: 5px;
+            font-size: 14px;
         }
-        .search-btn:hover {
-            background: #0056b3;
-        }
+        .search-btn:hover { background: #b71c1c; }
+
         .filter-container {
-            margin: 10px;
             display: flex;
-            gap: 10px;
             align-items: center;
+            gap: 8px;
         }
+
         .filter-select {
             padding: 6px 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
+            font-size: 13px;
         }
+
         .result-count {
-            margin: 10px;
-            color: #666;
+            text-align: center;
+            margin: 8px;
+            color: #555;
+        }
+
+        /* 右键菜单 */
+        #contextMenu {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 999;
+            overflow: hidden;
+        }
+        #contextMenu button {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            text-align: left;
+            transition: 0.2s;
+        }
+        #contextMenu button:hover { background-color: #f7f7f7; }
+
+        /* 客服按钮 */
+        #chatbot-button {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            background-color: #d32f2f;
+            color: white;
+            padding: 12px 18px;
+            border-radius: 30px;
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        #chatbot-button:hover { background-color: #b71c1c; }
+
+        /* 聊天窗口 */
+        #chatbot-window {
+            position: fixed;
+            right: 20px;
+            bottom: 80px;
+            width: 320px;
+            height: 420px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: #d32f2f;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            font-weight: bold;
+        }
+
+        .chat-body {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
             font-size: 14px;
         }
+
+        .chat-message {
+            margin: 6px 0;
+            line-height: 1.4;
+        }
+
+        .chat-user {
+            text-align: right;
+            color: #1976d2;
+        }
+
+        .chat-ai {
+            text-align: left;
+            color: #333;
+            background: #f7f7f7;
+            padding: 6px 8px;
+            border-radius: 6px;
+            display: inline-block;
+            max-width: 80%;
+        }
+
+        .chat-footer {
+            display: flex;
+            padding: 8px;
+            border-top: 1px solid #eee;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        #send-btn {
+            margin-left: 6px;
+            padding: 8px 12px;
+            background: #d32f2f;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #send-btn:hover { background: #b71c1c; }
+
     </style>
 </head>
+
 <body>
-<h2>🍗 KFC 门店地图管理系统</h2>
+<h2>🍗 KFC 门店地图管理系统（百度地图）</h2>
+
 <div class="search-container">
     <input type="text" id="searchInput" class="search-box" placeholder="输入店名或地址搜索..." onkeypress="handleKeyPress(event)">
     <button onclick="searchStores()" class="search-btn">搜索</button>
-    <button onclick="clearSearch()" class="search-btn" style="background: #6c757d;">显示全部</button>
+    <button onclick="clearSearch()" class="search-btn" style="background: #757575;">显示全部</button>
 
     <div class="filter-container">
-        <span>排序方式:</span>
+        <span>排序:</span>
         <select id="sortSelect" class="filter-select" onchange="applyFilters()">
-            <option value="name">按店名排序</option>
-            <option value="id">按ID排序</option>
+            <option value="name">按名称</option>
+            <option value="id">按ID</option>
         </select>
 
-        <span>显示数量:</span>
+        <span>数量:</span>
         <select id="limitSelect" class="filter-select" onchange="applyFilters()">
             <option value="0">全部</option>
-            <option value="10">前10个</option>
-            <option value="20">前20个</option>
-            <option value="50">前50个</option>
+            <option value="10">前10</option>
+            <option value="20">前20</option>
+            <option value="50">前50</option>
         </select>
     </div>
-
-    <div id="resultCount" class="result-count"></div>
 </div>
+
+<div id="resultCount" class="result-count"></div>
 <div id="map"></div>
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<!-- 右键菜单 -->
+<div id="contextMenu">
+    <button id="addStoreBtn">➕ 添加门店</button>
+</div>
+
+<!-- 客服按钮 & 聊天窗口 -->
+<div id="chatbot-button">💬 在线客服</div>
+
+<div id="chatbot-window">
+    <div class="chat-header">KFC 智能客服</div>
+    <div class="chat-body" id="chat-messages"></div>
+    <div class="chat-footer">
+        <input type="text" id="user-input" placeholder="请输入您的问题..." onkeypress="if(event.key==='Enter') sendMessage()">
+        <button id="send-btn" onclick="sendMessage()">发送</button>
+    </div>
+</div>
+
+<script src="https://api.map.baidu.com/api?v=3.0&ak=ugB6ZNeKv3iLm7xcvhnyWnZ4nYheeU5w"></script>
+<script src="https://api.map.baidu.com/library/MarkerClusterer/1.2/src/MarkerClusterer_min.js"></script>
+<script src="https://api.map.baidu.com/library/Heatmap/2.0/src/Heatmap_min.js"></script>
+
+
 <script>
-    // 全局变量
     let allStores = [];
     let currentMarkers = [];
     let currentDisplayedStores = [];
+    let rightClickPoint = null;
 
-    const map = L.map('map').setView([30.6, 114.3], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19
-    }).addTo(map);
+    function clearMarkers() {
+        currentMarkers.forEach(marker => map.removeOverlay(marker));
+        currentMarkers = [];
+    }
 
-    // 加载所有KFC门店
+
+    const map = new BMap.Map("map");
+    const centerPoint = new BMap.Point(114.3, 30.6);
+    map.centerAndZoom(centerPoint, 12);
+    map.enableScrollWheelZoom(true);
+
+
     async function loadKfc() {
         const res = await fetch('/api/kfc');
         allStores = await res.json();
@@ -101,54 +279,92 @@
         displayStoresOnMap(allStores);
     }
 
-    // 在地图上显示门店
     function displayStoresOnMap(stores) {
-        // 清除现有标记
         clearMarkers();
 
         stores.forEach(kfc => {
-            const marker = L.marker([kfc.latitude, kfc.longitude]).addTo(map)
-                .bindPopup(`<b>${kfc.name}</b><br>${kfc.address}<br>${kfc.phone || ''}<br>
-            <button onclick="editKfc(${kfc.id})">编辑</button>
-            <button onclick="deleteKfc(${kfc.id})">删除</button>`);
+            const point = new BMap.Point(kfc.longitude, kfc.latitude);
+            const marker = new BMap.Marker(point);
+            map.addOverlay(marker);
+
+            // 自定义 InfoWindow HTML
+            const infoContent = `
+            <div style="
+                font-family: Arial, sans-serif;
+                width: 220px;
+                padding: 12px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                background-color: #fff;
+            ">
+                <h3 style="margin:0 0 8px; font-size:16px; color:#ff4d4f;">🍗 ${kfc.name}</h3>
+                <p style="margin:0 0 4px; font-size:14px; color:#555;">
+                    📍 ${kfc.address || '暂无地址'}
+                </p>
+                <p style="margin:0 0 8px; font-size:14px; color:#555;">
+                    ☎ ${kfc.phone || '暂无电话'}
+                </p>
+                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                    <button onclick="editKfc(${kfc.id})"
+                        style="
+                            padding:4px 8px;
+                            border:none;
+                            border-radius:4px;
+                            background-color:#1890ff;
+                            color:#fff;
+                            cursor:pointer;
+                        ">编辑</button>
+                    <button onclick="deleteKfc(${kfc.id})"
+                        style="
+                            padding:4px 8px;
+                            border:none;
+                            border-radius:4px;
+                            background-color:#f5222d;
+                            color:#fff;
+                            cursor:pointer;
+                        ">删除</button>
+                </div>
+            </div>
+        `;
+
+            const infoWindow = new BMap.InfoWindow(infoContent, {
+                enableAutoPan: true,   // 打开InfoWindow时地图自动平移
+                width: 250,
+                height: 140,
+                title: ''
+            });
+
+            marker.addEventListener('click', () => marker.openInfoWindow(infoWindow));
             currentMarkers.push(marker);
         });
     }
 
-    // 清除所有标记
-    function clearMarkers() {
-        currentMarkers.forEach(marker => {
-            map.removeLayer(marker);
-        });
-        currentMarkers = [];
-    }
 
-    // 搜索门店
+
     function searchStores() {
         const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
-
-        if (!searchTerm) {
-            currentDisplayedStores = [...allStores];
-        } else {
-            currentDisplayedStores = allStores.filter(store =>
+        currentDisplayedStores = searchTerm
+            ? allStores.filter(store =>
                 store.name.toLowerCase().includes(searchTerm) ||
                 (store.address && store.address.toLowerCase().includes(searchTerm)) ||
                 (store.phone && store.phone.includes(searchTerm))
-            );
-        }
-
+            )
+            : [...allStores];
         updateResultCount();
         applyFilters();
-    }
-
-    // 处理键盘事件（按回车搜索）
-    function handleKeyPress(event) {
-        if (event.key === 'Enter') {
-            searchStores();
+        if (currentDisplayedStores.length > 0) {
+            const first = currentDisplayedStores[0];
+            const point = new BMap.Point(first.longitude, first.latitude);
+            map.centerAndZoom(point, currentDisplayedStores.length === 1 ? 16 : 13);
+        } else {
+            alert("未找到相关门店，请检查关键字。");
         }
     }
 
-    // 清空搜索
+    function handleKeyPress(event) {
+        if (event.key === 'Enter') searchStores();
+    }
+
     function clearSearch() {
         document.getElementById('searchInput').value = '';
         document.getElementById('sortSelect').value = 'name';
@@ -158,68 +374,53 @@
         applyFilters();
     }
 
-    // 应用所有筛选条件
     function applyFilters() {
         let filteredStores = [...currentDisplayedStores];
-
-        // 排序
         const sortBy = document.getElementById('sortSelect').value;
-        if (sortBy === 'name') {
-            filteredStores.sort((a, b) => a.name.localeCompare(b.name));
-        } else if (sortBy === 'id') {
-            filteredStores.sort((a, b) => a.id - b.id);
-        }
-
-        // 数量限制
+        if (sortBy === 'name') filteredStores.sort((a,b) => a.name.localeCompare(b.name));
+        else if (sortBy === 'id') filteredStores.sort((a,b) => a.id - b.id);
         const limit = parseInt(document.getElementById('limitSelect').value);
-        if (limit > 0) {
-            filteredStores = filteredStores.slice(0, limit);
-        }
-
-        // 显示到地图
+        if (limit > 0) filteredStores = filteredStores.slice(0, limit);
         displayStoresOnMap(filteredStores);
-
-        // 如果只有一个结果，自动聚焦到该标记
-        if (filteredStores.length === 1) {
-            const store = filteredStores[0];
-            map.setView([store.latitude, store.longitude], 15);
-        }
     }
 
-    // 更新结果计数
     function updateResultCount() {
         const countElement = document.getElementById('resultCount');
         const totalCount = allStores.length;
         const displayedCount = currentDisplayedStores.length;
-
-        if (displayedCount === totalCount) {
-            countElement.textContent = `共找到 ${totalCount} 个门店`;
-        } else {
-            countElement.textContent = `找到 ${displayedCount} 个门店（共 ${totalCount} 个）`;
-        }
+        countElement.textContent = displayedCount === totalCount
+            ? `共找到 ${totalCount} 个门店`
+            : `找到 ${displayedCount} 个门店（共 ${totalCount} 个）`;
     }
 
-    // 地图点击事件 - 添加新门店
-    map.on('click', async e => {
+    document.getElementById('map').addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('contextmenu', e => e.preventDefault());
+
+    map.addEventListener('rightclick', function(e) {
+        rightClickPoint = e.point;
+        const menu = document.getElementById('contextMenu');
+        const pixel = map.pointToPixel(e.point);
+        menu.style.left = pixel.x + 'px';
+        menu.style.top = pixel.y + 'px';
+        menu.style.display = 'block';
+    });
+    map.addEventListener('click', () => document.getElementById('contextMenu').style.display = 'none');
+    document.getElementById('contextMenu').addEventListener('mousedown', e => e.stopPropagation());
+
+    document.getElementById('addStoreBtn').addEventListener('click', async () => {
         const name = prompt("请输入KFC店名：");
         if (!name) return;
         const address = prompt("请输入地址：");
         const phone = prompt("请输入电话：");
-        const kfc = { name, address, phone, latitude: e.latlng.lat, longitude: e.latlng.lng };
-
-        await fetch('/api/kfc', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(kfc)
-        });
-        // 重新加载数据而不是刷新页面
+        const kfc = { name, address, phone, latitude: rightClickPoint.lat, longitude: rightClickPoint.lng };
+        await fetch('/api/kfc', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(kfc) });
         await loadKfc();
+        document.getElementById('contextMenu').style.display = 'none';
     });
 
     async function deleteKfc(id) {
         if (!confirm('确定删除该KFC门店吗？')) return;
         await fetch(`/api/kfc/${id}`, { method: 'DELETE' });
-        // 重新加载数据而不是刷新页面
         await loadKfc();
     }
 
@@ -228,16 +429,91 @@
         const address = prompt("请输入新的地址：");
         const phone = prompt("请输入新的电话：");
         if (!name) return;
-        const res = await fetch(`/api/kfc/${id}`, {
+        await fetch(`/api/kfc/${id}`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ name, address, phone })
         });
-        // 重新加载数据而不是刷新页面
         await loadKfc();
     }
 
-    // 初始化加载
+    // ✅ 客服窗口逻辑
+    const chatButton = document.getElementById('chatbot-button');
+    const chatWindow = document.getElementById('chatbot-window');
+    chatButton.addEventListener('click', () => {
+        chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
+    });
+
+    async function sendMessage() {
+        const msg = document.getElementById('user-input').value.trim();
+        if (!msg) return;
+
+        const chatBox = document.getElementById('chat-messages');
+        chatBox.innerHTML += `<p class="user-msg"><b>你:</b> ${msg}</p>`;
+        document.getElementById('user-input').value = '';
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        // 👉 显示“正在思考中...”占位
+        const thinkingMsgId = 'thinking-' + Date.now();
+        chatBox.innerHTML += `<p id="${thinkingMsgId}" class="ai-msg"><b>AI:</b> <span id="typing-text">🤖 正在思考中...</span></p>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ message: msg })
+            });
+
+            const data = await response.json();
+            const answer = data.reply || '（AI暂未响应）';
+
+            // 👉 动态打字效果
+            const thinkingMsg = document.getElementById(thinkingMsgId);
+            if (thinkingMsg) {
+                const span = thinkingMsg.querySelector('#typing-text');
+                typeWriter(span, answer, 25); // 打字速度（毫秒/字符）
+            }
+
+            chatBox.scrollTop = chatBox.scrollHeight;
+        } catch (err) {
+            const thinkingMsg = document.getElementById(thinkingMsgId);
+            if (thinkingMsg) {
+                thinkingMsg.innerHTML = `<b>AI:</b> ⚠️ AI服务连接失败，请稍后再试。`;
+                thinkingMsg.style.color = 'red';
+            } else {
+                chatBox.innerHTML += `<p style="color:red;">AI服务连接失败，请稍后再试。</p>`;
+            }
+        }
+    }
+
+    /**
+     * 打字机效果函数
+     * @param {HTMLElement} element - 要显示文本的元素
+     * @param {string} text - 要打出的文本
+     * @param {number} speed - 每个字符间隔时间（毫秒）
+     */
+    function typeWriter(element, text, speed = 30) {
+        element.innerHTML = '';
+        let i = 0;
+
+        function typing() {
+            if (i < text.length) {
+                // 处理换行符
+                if (text.charAt(i) === '\n') {
+                    element.innerHTML += '<br>';
+                } else {
+                    element.innerHTML += text.charAt(i);
+                }
+                i++;
+                setTimeout(typing, speed);
+            }
+        }
+        typing();
+    }
+
+
+
     loadKfc();
 </script>
 </body>
